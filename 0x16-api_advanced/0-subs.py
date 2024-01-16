@@ -1,41 +1,66 @@
 #!/usr/bin/python3
-import praw
 
-def count_words(subreddit, word_list, after=None, counts=None):
-    # Initialize Reddit API connection using PRAW
-    reddit = praw.Reddit(
-        client_id='YOUR_CLIENT_ID',
-        client_secret='YOUR_CLIENT_SECRET',
-        user_agent='YOUR_USER_AGENT'
-    )
+"""
+Reddit API Subscribers Counter
 
-    # Initialize counts dictionary if not provided
-    if counts is None:
-        counts = {}
+This script queries the Reddit API and returns the number of subscribers for a given subreddit.
 
-    # Fetch hot articles in the subreddit
+Usage:
+    ./subreddit_subscribers.py <subreddit_name>
+"""
+
+import requests
+
+def number_of_subscribers(subreddit):
+    """
+    Retrieve the number of subscribers for a given subreddit.
+
+    Args:
+        subreddit (str): The name of the subreddit.
+
+    Returns:
+        int: The number of subscribers. Returns 0 for invalid subreddits.
+    """
+    # Reddit API endpoint for getting subreddit information
+    api_url = f'https://www.reddit.com/r/{subreddit}/about.json'
+
+    # Set a custom User-Agent to avoid errors related to Too Many Requests
+    headers = {'User-Agent': 'CustomUserAgent'}
+
     try:
-        subreddit_obj = reddit.subreddit(subreddit)
-        hot_articles = subreddit_obj.hot(limit=100, params={'after': after})
-    except praw.exceptions.Redirect as e:
-        # Invalid subreddit or other error handling
-        print(f"Invalid subreddit or error: {e}")
-        return
+        # Send a GET request to the Reddit API
+        response = requests.get(api_url, headers=headers)
 
-    # Iterate through the hot articles
-    for submission in hot_articles:
-        # Call recursively with the next page's after parameter
-        count_words(subreddit, word_list, after=submission.name, counts=counts)
+        # Check if the request was successful (status code 200)
+        if response.status_code == 200:
+            # Parse the JSON response
+            data = response.json()
 
-        # Parse the title and count the occurrences of keywords
-        title = submission.title.lower()
-        for keyword in word_list:
-            # Ensure the keyword is not a substring of a larger word
-            if f" {keyword} " in f" {title} ":
-                counts[keyword] = counts.get(keyword, 0) + 1
+            # Extract and return the number of subscribers
+            return data['data']['subscribers']
+        elif response.status_code == 404:
+            # If the subreddit is not found, return 0
+            return 0
+        else:
+            # Print an error message for other status codes
+            print(f"Error: {response.status_code}")
+            return 0
+    except Exception as e:
+        # Print an error message for exceptions
+        print(f"Error: {e}")
+        return 0
 
-    # Print the results after processing all articles
-    if after is None:
-        sorted_counts = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
-        for keyword, count in sorted_counts:
-            print(f"{keyword}: {count}")
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) != 2:
+        print("Usage: ./subreddit_subscribers.py <subreddit_name>")
+        sys.exit(1)
+
+    subreddit_name = sys.argv[1]
+    subscribers_count = number_of_subscribers(subreddit_name)
+
+    if subscribers_count > 0:
+        print(f"The subreddit r/{subreddit_name} has {subscribers_count} subscribers.")
+    else:
+        print(f"The subreddit r/{subreddit_name} is not valid or does not exist.")
